@@ -45,8 +45,6 @@ ul{margin:4px 0;padding-left:22px}
 <section class="card">
   <label for="t">Názov hodiny</label>
   <input id="t" placeholder="napr. Biológia – bunka">
-  <label for="k" style="margin-top:10px">Anthropic API kľúč (uložený iba v tomto prehliadači)</label>
-  <input id="k" type="password" placeholder="sk-ant-…" autocomplete="off">
   <div class="row">
     <button id="mic" class="p">● Začať nahrávať</button>
     <button id="gen" class="p">Vytvoriť poznámky</button>
@@ -119,17 +117,10 @@ function saveCur(result){
 async function generate(){
   const text=$('#tx').value.trim();
   if(text.length<40){alert('Prepis je príliš krátky. Nahraj hodinu alebo vlož text.');return}
-  const key=$('#k').value.trim();if(!key){alert('Zadaj svoj Anthropic API kľúč.');return}
+  
   const b=$('#gen');b.disabled=true;b.textContent='Spracúvam…';
-  const prompt='Si asistent pre študentov. Nižšie je prepis školskej hodiny (môže obsahovať chyby z rozpoznávania reči). '+
-  'Vytvor v slovenčine prehľadné študijné poznámky. Nič si nevymýšľaj, drž sa prepisu. '+
-  'Odpovedz IBA platným JSON bez markdownu v tvare: {"title":string,"summary":string (3-5 viet),"keyPoints":[string],'+
-  '"notes":[{"heading":string,"points":[string]}],"terms":[{"term":string,"meaning":string}],"todo":[string] (domáce úlohy, testy, termíny, ak ich učiteľ spomenul),'+
-  '"questions":[string] (3-5 otázok na opakovanie)}.\n\nNázov hodiny: '+($('#t').value||'neuvedený')+'\n\nPREPIS:\n'+text.slice(0,60000);
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:3000,messages:[{role:'user',content:prompt}]})});
-    const d=await resp.json();if(!resp.ok)throw new Error((d.error&&d.error.message)||'Chyba služby');
-    const r=JSON.parse(d.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
+  const resp=await fetch('/api/notes',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:$('#t').value,text:text})});
+    const r=await resp.json();if(!resp.ok)throw new Error(r.error||'Chyba služby');
     render(r);saveCur(r);
     $('#out').scrollIntoView({behavior:'smooth'});
   }catch(e){
@@ -159,8 +150,6 @@ $('#tx').addEventListener('change',()=>{if($('#tx').value.trim())saveCur()});
 load();renderList();
 
 (()=>{
-  try{$('#k').value=localStorage.getItem('akey')||''}catch(e){}
-  $('#k').addEventListener('change',()=>{try{localStorage.setItem('akey',$('#k').value.trim())}catch(e){}});
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){$('#mic').hidden=true;$('#nomic').hidden=false;return}
   let rc=null,want=false;
